@@ -32,8 +32,10 @@ impl Board {
     pub fn get_moves(self) -> Vec<usize> {
         let mut available_moves: Vec<usize> = vec![];
 
-        for i in 0..WIDTH {
-            available_moves.push(i);
+        for column in 0..WIDTH {
+            if self.column_pieces[column] != 6 {
+                available_moves.push(column);
+            }
         }
 
         available_moves
@@ -82,14 +84,11 @@ impl Board {
                 || check_horizontal(bb, index)
                 || check_diagonals(bb, index))
         {
-            println!(
-                "v-{}/h-{}/d-{}",
-                check_vertical(bb, index),
-                check_horizontal(bb, index),
-                check_diagonals(bb, index)
-            );
-
             self.winner = Some(yellow_player)
+        }
+
+        if self.winner == None && self.get_moves().len() == 0 {
+            self.draw = false;
         }
     }
 
