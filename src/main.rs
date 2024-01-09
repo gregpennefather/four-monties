@@ -3,6 +3,7 @@ use rand::RngCore;
 use colored::Colorize;
 
 mod board;
+mod player;
 
 fn main() {
     let mut board = Board::default();

@@ -12,6 +12,7 @@ pub struct Board {
     pub column_pieces: [usize; WIDTH],
     pub yellow_turn: bool,
     pub winner: Option<bool>,
+    pub draw: bool
 }
 
 impl Default for Board {
@@ -22,6 +23,7 @@ impl Default for Board {
             column_pieces: [0; WIDTH],
             yellow_turn: true,
             winner: None,
+            draw: false
         }
     }
 }
@@ -120,6 +122,7 @@ impl Board {
             yellow_turn: blue_bb.count_ones() == yellow_bb.count_ones(),
             column_pieces: [0; WIDTH], // TODO
             winner: None,
+            draw: false
         }
     }
 }
