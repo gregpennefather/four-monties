@@ -1,7 +1,7 @@
 use crate::board::Board;
 
-mod randy;
+pub mod randy;
 
 pub trait Player {
-    fn select_move(board: Board) -> usize;
+    fn select_move(&self, board: Board) -> usize;
 }
