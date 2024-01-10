@@ -11,19 +11,34 @@ mod playout;
 mod record;
 
 pub struct SearchTree {
-    pub root: Link,
+    pub root: ArcNode,
 }
 
 impl SearchTree {
     pub fn new(board: Board) -> Self {
         Self {
-            root: Some(Arc::new(NodeContent::new_root(board))),
+            root: Arc::new(NodeContent::new_root(board)),
         }
+    }
+
+    pub fn record_move(&mut self, index: usize, board: Board) -> Board {
+        let root = self.root.clone();
+        let children = root.children.read().unwrap();
+        let child = children[index].clone();
+        drop(children);
+        let new_root = match child {
+            Some(c) => c.clone(),
+            None => insert_to_node_index(&mut self.root, index, board).clone()
+        };
+
+        self.root = new_root.clone();
+        board
     }
 
     pub fn produce_move(&mut self, board_state: Board) {
         // let leaf = self.root.select();
-        let new_leaf = self.expansion(board_state);
+        let root = self.root.clone().seek(board_state);
+        let new_leaf = self.expansion(root.clone().unwrap().board());
         let sim_result = self.simulation(new_leaf.clone());
         println!("sim_result: {sim_result}");
         backpropagation(new_leaf.clone(), sim_result);
@@ -31,8 +46,8 @@ impl SearchTree {
     }
 
     pub fn expansion(&mut self, board: Board) -> ArcNode {
-        let root = self.root.as_ref().unwrap();
-        let mut leaf = root.clone().seek(board).unwrap();
+        let root = self.root.clone();
+        let mut leaf = root.seek(board).unwrap();
 
         let mut rand = rand::thread_rng();
         let moves = leaf.board().get_moves();
@@ -79,6 +94,6 @@ mod test {
         let tree = SearchTree::new(Board::default());
 
         // Assert
-        assert!(tree.root.is_some());
+        assert_eq!(tree.root.board, Board::default());
     }
 }

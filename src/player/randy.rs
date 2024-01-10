@@ -1,3 +1,5 @@
+use crate::board::Board;
+
 use super::Player;
 use rand::RngCore;
 
@@ -10,5 +12,9 @@ impl Player for Randy {
         let moves = board.get_moves();
         let rand_index: usize = rand.next_u64() as usize % moves.len();
         moves[rand_index]
+    }
+
+    fn record_move(&mut self, index: usize, board: Board) -> crate::board::Board {
+        board
     }
 }
