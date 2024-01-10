@@ -5,7 +5,7 @@ use log::debug;
 pub const WIDTH: usize = 7;
 pub const HEIGHT: usize = 6;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct Board {
     pub yellow_bb: u64,
     pub blue_bb: u64,
@@ -13,6 +13,12 @@ pub struct Board {
     pub yellow_turn: bool,
     pub winner: Option<bool>,
     pub draw: bool
+}
+
+impl PartialEq for Board {
+    fn eq(&self, other: &Self) -> bool {
+        self.yellow_bb == other.yellow_bb && self.blue_bb == other.blue_bb
+    }
 }
 
 impl Default for Board {
@@ -114,7 +120,7 @@ impl Board {
         }
     }
 
-    fn setup(yellow_bb: u64, blue_bb: u64) -> Self {
+    pub fn setup(yellow_bb: u64, blue_bb: u64) -> Self {
         Self {
             yellow_bb: yellow_bb,
             blue_bb: blue_bb,

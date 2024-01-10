@@ -15,7 +15,7 @@ impl Tournament
         }
     }
 
-    pub fn play(&self) -> Board {
+    pub fn play(&mut self) -> Board {
         let mut board = Board::default();
 
         loop {
