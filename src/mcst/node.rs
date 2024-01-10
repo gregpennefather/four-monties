@@ -2,10 +2,13 @@ use std::sync::{Arc, Mutex, RwLock, Weak};
 
 use crate::board::{Board, WIDTH};
 
+use super::{playout::PlayoutResult, record::Record};
+
 #[derive(Debug)]
 pub struct NodeContent {
     pub board: Board,
     pub parent: Weak<Self>,
+    pub record: RwLock<Record>,
     pub children: RwLock<[Link; 7]>,
 }
 
@@ -14,6 +17,7 @@ impl NodeContent {
         NodeContent {
             board: board,
             parent: Weak::new(),
+            record: Default::default(),
             children: RwLock::new(Default::default()),
         }
     }
@@ -21,6 +25,7 @@ impl NodeContent {
         NodeContent {
             board: board,
             parent: parent_ptr,
+            record: Default::default(),
             children: RwLock::new(Default::default()),
         }
     }
@@ -40,6 +45,8 @@ pub type Link = Option<ArcNode>;
 // }
 
 pub trait Node {
+    fn board(&self) -> Board;
+    fn record_result(&mut self, result: PlayoutResult);
     fn new_child(&self, index: usize, board: Board) -> Self;
     fn seek(self, board: Board) -> Option<Self>
     where
@@ -56,6 +63,18 @@ pub fn insert_to_node_index(root: &mut ArcNode, index: usize, board: Board) -> &
 }
 
 impl Node for ArcNode {
+
+    fn board(&self) -> Board {
+        self.board
+    }
+
+    fn record_result(&mut self, result: PlayoutResult) {
+        match self.record.try_write() {
+            Ok(mut r) => r.increment(result),
+            Err(e) => panic!("Record result lock error {e:?}")
+        }
+    }
+
     fn new_child(&self, index: usize, board: Board) -> Self {
         let lock = self.children.read();
         if lock.unwrap()[index].is_some() {

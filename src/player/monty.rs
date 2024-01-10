@@ -16,7 +16,7 @@ impl Monty {
 
 impl Player for Monty {
     fn select_move(&mut self, board: crate::board::Board) -> usize {
-        self.search_tree.expansion(board);
+        self.search_tree.produce_move(board);
         let moves = board.get_moves();
         moves[0]
     }
