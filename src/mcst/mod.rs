@@ -47,6 +47,22 @@ impl SearchTree {
         board
     }
 
+    pub fn print_state(&self) {
+        let children = self.root.children.read().unwrap();
+        for i in 0..WIDTH {
+            let r = match children[i].clone() {
+                Some(c) => {
+                    // Else rank moves by simulation count
+                    let r = c.record.read().unwrap().played as usize;
+
+                    println!("{i}: {r} - {:?}", c.board.winner);
+                }
+                None => println!("{i}: not explored"),
+            };
+        }
+        println!("Current selection: {}", self.select_move());
+    }
+
     pub fn select_move(&self) -> usize {
         let children = self.root.children.read().unwrap();
         let mut m = 0;
@@ -56,13 +72,14 @@ impl SearchTree {
                 Some(c) => {
                     // If move is a winner pick it
                     if c.board().winner == Some(self.root.board.yellow_turn) {
-                        return i
+                        return i;
                     }
                     // Else rank moves by simulation count
-                    c.record.read().unwrap().played as usize},
+                    c.record.read().unwrap().played as usize
+                }
                 None => 0,
             };
-            if r > m {
+            if r > m_s {
                 m = i;
                 m_s = r
             }
@@ -173,9 +190,8 @@ fn traverse_tree_ucb(node: ArcNode, parent_sims: f32, depth: usize) -> (Option<A
         let mut selected_node: Option<ArcNode> = None;
         for i in 0..WIDTH {
             let child = children[i].clone();
-            if child.is_some()  {
-                let (selected, r) =
-                    traverse_tree_ucb(child.unwrap(), sims, depth + 1);
+            if child.is_some() {
+                let (selected, r) = traverse_tree_ucb(child.unwrap(), sims, depth + 1);
 
                 if r > max_score {
                     max_score = r;

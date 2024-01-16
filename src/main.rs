@@ -1,6 +1,6 @@
 use crate::{
     board::{Board, WIDTH},
-    player::{monty::Monty, randy::Randy},
+    player::{monty::Monty, randy::Randy, yu::Yu},
     tournament::Tournament,
 };
 use colored::Colorize;
@@ -21,7 +21,7 @@ fn main() {
     let mut yellow_wins = 0;
     let mut blue_wins = 0;
     let mut draws = 0;
-    for i in 0..10000 {
+    for i in 0..1000 {
         let board = Board::default();
         let mut tournament = Tournament::new(Box::new(Monty::new(board)), Box::new(Randy));
 
