@@ -5,14 +5,15 @@ use log::debug;
 pub const WIDTH: usize = 7;
 pub const HEIGHT: usize = 6;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
 pub struct Board {
     pub yellow_bb: u64,
     pub blue_bb: u64,
     pub column_pieces: [usize; WIDTH],
     pub yellow_turn: bool,
     pub winner: Option<bool>,
-    pub draw: bool
+    pub draw: bool,
+    pub complete: bool
 }
 
 impl PartialEq for Board {
@@ -29,8 +30,19 @@ impl Default for Board {
             column_pieces: [0; WIDTH],
             yellow_turn: true,
             winner: None,
-            draw: false
+            draw: false,
+            complete: false
         }
+    }
+}
+
+impl Debug for Board {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Board")
+            .field(&self.yellow_bb)
+            .field(&self.blue_bb)
+            .field(&self.complete)
+            .finish()
     }
 }
 
@@ -90,11 +102,13 @@ impl Board {
                 || check_horizontal(bb, index)
                 || check_diagonals(bb, index))
         {
-            self.winner = Some(yellow_player)
+            self.winner = Some(yellow_player);
+            self.complete = true;
         }
 
         if self.winner == None && self.get_moves().len() == 0 {
-            self.draw = false;
+            self.draw = true;
+            self.complete = true;
         }
     }
 
@@ -120,14 +134,15 @@ impl Board {
         }
     }
 
-    pub fn setup(yellow_bb: u64, blue_bb: u64) -> Self {
+    pub fn setup(yellow_bb: u64, blue_bb: u64, column_pieces: [usize; WIDTH]) -> Self {
         Self {
             yellow_bb: yellow_bb,
             blue_bb: blue_bb,
             yellow_turn: blue_bb.count_ones() == yellow_bb.count_ones(),
-            column_pieces: [0; WIDTH], // TODO
+            column_pieces,
             winner: None,
-            draw: false
+            draw: false,
+            complete: false
         }
     }
 }
@@ -149,7 +164,6 @@ fn check_diagonals(bb: u64, index: usize) -> bool {
     for step_tl_br in 1..rank + 1 {
         let offset = step_tl_br * WIDTH + step_tl_br;
         if index < offset {
-            println!("{index} < {offset}");
             break;
         }
         let pos = index - offset;
@@ -238,7 +252,7 @@ mod test {
     pub fn check_vertical_valid_win() {
         let file = 4;
         let bb = 0x204081 << file;
-        let board = Board::setup(bb, 0);
+        let board = Board::setup(bb, 0, [0; WIDTH]);
 
         board.print_board();
         assert!(check_vertical(bb, (file + WIDTH * 3)))
@@ -248,7 +262,7 @@ mod test {
     pub fn check_vertical_below_4th_row_fails() {
         let file = 6;
         let bb = 0x4081 << file;
-        let board = Board::setup(bb, 0);
+        let board = Board::setup(bb, 0, [0; WIDTH]);
 
         board.print_board();
         assert!(!check_vertical(bb, file + WIDTH * 2))
@@ -258,7 +272,7 @@ mod test {
     pub fn check_vertical_above_4th_row_but_missing_a_position() {
         let file = 5;
         let bb = 0x10200080 << file;
-        let board = Board::setup(bb, 0);
+        let board = Board::setup(bb, 0, [0; WIDTH]);
 
         board.print_board();
         assert!(!check_vertical(bb, file + WIDTH * 4))
@@ -268,7 +282,7 @@ mod test {
     pub fn check_vertical_win_with_noise() {
         let file = 5;
         let bb = 0x14606188 << file;
-        let board = Board::setup(bb, 0);
+        let board = Board::setup(bb, 0, [0; WIDTH]);
 
         board.print_board();
         assert!(check_vertical(bb, file + WIDTH * 4))
@@ -277,7 +291,7 @@ mod test {
     #[test]
     pub fn check_horizontal_valid_win() {
         let bb = 0x78;
-        let board = Board::setup(0, bb);
+        let board = Board::setup(0, bb, [0; WIDTH]);
 
         board.print_board();
         assert!(check_horizontal(bb, 5));
@@ -289,7 +303,7 @@ mod test {
     #[test]
     pub fn check_horizontal_no_wrapping_wins() {
         let bb = 0xF0;
-        let board = Board::setup(0, bb);
+        let board = Board::setup(0, bb, [0; WIDTH]);
 
         board.print_board();
         assert!(!check_horizontal(bb, 7));
@@ -301,7 +315,7 @@ mod test {
     #[test]
     pub fn check_horizontal_only_win_on_left_side() {
         let bb = 0x1EC000;
-        let board = Board::setup(0, bb);
+        let board = Board::setup(0, bb, [0; WIDTH]);
 
         board.print_board();
         assert!(!check_horizontal(bb, 14));
@@ -312,7 +326,7 @@ mod test {
     pub fn check_horizontal_case_0() {
         let bb = 0x2020F65;
 
-        let board = Board::setup(bb, 0);
+        let board = Board::setup(bb, 0, [0; WIDTH]);
         board.print_board();
         assert!(check_horizontal(bb, 8));
     }
@@ -321,7 +335,7 @@ mod test {
     pub fn check_horizontal_case_1() {
         let bb = 0x8F;
 
-        let board = Board::setup(bb, 0);
+        let board = Board::setup(bb, 0, [0; WIDTH]);
         board.print_board();
         assert!(check_horizontal(bb, 1));
     }
@@ -329,7 +343,7 @@ mod test {
     #[test]
     pub fn check_diagonal_valid_starting_in_bottom_corner_0() {
         let bb = 0x1010101;
-        let board = Board::setup(0, bb);
+        let board = Board::setup(0, bb, [0; WIDTH]);
 
         board.print_board();
         assert!(check_diagonals(bb, 0));
@@ -338,7 +352,7 @@ mod test {
     #[test]
     pub fn check_diagonal_valid_starting_in_bottom_corner_6() {
         let bb = 0x1041040;
-        let board = Board::setup(0, bb);
+        let board = Board::setup(0, bb, [0; WIDTH]);
 
         board.print_board();
         assert!(check_diagonals(bb, 24));
@@ -347,7 +361,7 @@ mod test {
     #[test]
     pub fn check_diagonal_bl_not_on_file_0() {
         let bb = 0x1041040 << 6;
-        let board = Board::setup(0, bb);
+        let board = Board::setup(0, bb, [0; WIDTH]);
 
         board.print_board();
         assert!(check_diagonals(bb, 30));
@@ -356,7 +370,7 @@ mod test {
     #[test]
     pub fn check_diagonal_br_not_on_file_0() {
         let bb = 0x1010101 << 10;
-        let board = Board::setup(0, bb);
+        let board = Board::setup(0, bb, [0; WIDTH]);
 
         board.print_board();
         assert!(check_diagonals(bb, 26));
@@ -365,7 +379,7 @@ mod test {
     #[test]
     pub fn check_diagonal_bl_wrapping_fails() {
         let bb = 0x1041040 >> 5;
-        let board = Board::setup(0, bb);
+        let board = Board::setup(0, bb, [0; WIDTH]);
 
         board.print_board();
         assert!(!check_diagonals(bb, 13));
@@ -374,7 +388,7 @@ mod test {
     #[test]
     pub fn check_diagonal_br_wrapping_fails() {
         let bb = 0x1010101 << 12;
-        let board = Board::setup(0, bb);
+        let board = Board::setup(0, bb, [0; WIDTH]);
 
         board.print_board();
         assert!(!check_diagonals(bb, 28));
@@ -384,7 +398,7 @@ mod test {
     pub fn check_diagonal_case_0() {
         let bb = 0x8219;
 
-        let board = Board::setup(bb, 0);
+        let board = Board::setup(bb, 0, [0; WIDTH]);
         board.print_board();
         assert!(!check_diagonals(bb, 9));
     }
@@ -393,7 +407,7 @@ mod test {
     pub fn check_diagonal_case_1() {
         let bb = 0x10099;
 
-        let board = Board::setup(0, bb);
+        let board = Board::setup(0, bb, [0; WIDTH]);
         board.print_board();
         assert!(!check_diagonals(bb, 7));
     }
@@ -402,7 +416,7 @@ mod test {
     pub fn check_diagonal_case_2() {
         let bb = 13314539663852;
 
-        let board = Board::setup(bb, 0);
+        let board = Board::setup(bb, 0, [0; WIDTH]);
         board.print_board();
         assert!(!check_diagonals(bb, 19));
     }
@@ -411,7 +425,7 @@ mod test {
     pub fn check_diagonal_case_3() {
         let bb = 0x104104;
 
-        let board = Board::setup(bb, 0);
+        let board = Board::setup(bb, 0, [0; WIDTH]);
         board.print_board();
         assert!(!check_diagonals(bb, 3));
     }
@@ -419,8 +433,20 @@ mod test {
     pub fn check_diagonal_case_4() {
         let bb = 0x208208;
 
-        let board = Board::setup(bb, 0);
+        let board = Board::setup(bb, 0, [0; WIDTH]);
         board.print_board();
         assert!(check_diagonals(bb, 4));
+    }
+
+    #[test]
+    pub fn update_winner_move_leading_to_draw() {
+        // Arrange
+        let b = Board::setup(890452430364, 1308570825187, [6, 6, 6, 6, 6, 6, 5]);
+
+        // Act
+        let r = b.play_move(6);
+
+        // Assert
+        assert!(r.draw);
     }
 }

@@ -2,8 +2,8 @@ use super::playout::PlayoutResult;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Record {
-    wins: u16,
-    played: u16,
+    pub wins: u16,
+    pub played: u16,
 }
 
 impl Record {

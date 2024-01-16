@@ -1,6 +1,7 @@
 use std::fmt::Write;
 
 use crate::board::Board;
+use rand::RngCore;
 
 #[derive(Clone, Copy, Debug)]
 pub enum PlayoutResult {
@@ -19,8 +20,39 @@ impl std::fmt::Display for PlayoutResult {
     }
 }
 
-pub fn from(board: Board) -> PlayoutResult {
-    PlayoutResult::Draw
+pub fn from(mut board: Board) -> PlayoutResult {
+    if board.get_moves().len() == 0 {
+        println!("Trying to simulate state with no moves: {board:?}");
+    }
+    let mut rand = rand::thread_rng();
+    let current_player_yellow = board.yellow_turn;
+    for i in 0..1000 {
+        let moves = board.get_moves();
+        if board.get_moves().len() == 0 {
+            println!("depth {i} board: {board:?}");
+            board.print_board();
+        }
+
+
+        let rand_index: usize = rand.next_u64() as usize % moves.len();
+        board = board.play_move(moves[rand_index]);
+
+        if board.draw {
+            return PlayoutResult::Draw;
+        }
+
+        match board.winner {
+            Some(winner) => {
+                return if winner != current_player_yellow {
+                    PlayoutResult::Loss
+                } else {
+                    PlayoutResult::Win
+                };
+            }
+            None => continue,
+        }
+    }
+    return PlayoutResult::Draw;
 }
 
 impl PlayoutResult {

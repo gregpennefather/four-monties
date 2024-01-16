@@ -1,5 +1,5 @@
 use crate::{
-    board::Board,
+    board::{Board, WIDTH},
     player::{monty::Monty, randy::Randy},
     tournament::Tournament,
 };
@@ -12,18 +12,37 @@ mod player;
 mod tournament;
 
 fn main() {
-    let board = Board::default();
-    let mut tournament = Tournament::new(Box::new(Monty::new(board)), Box::new(Randy));
+    // let b = Board::setup(890452430364, 3507594080739, [0;WIDTH]);
+    // // let b = Board::setup(890452430364, 1308570825187, [6,6,6,6,6,6,5]);
+    // println!("is_draw: {}", b.draw);
+    // b.print_board();
+    // return;
 
-    let board = tournament.play();
+    let mut yellow_wins = 0;
+    let mut blue_wins = 0;
+    let mut draws = 0;
+    for i in 0..10000 {
+        let board = Board::default();
+        let mut tournament = Tournament::new(Box::new(Monty::new(board)), Box::new(Randy));
 
-    board.print_board();
-    println!(
-        "Winner: {}",
-        if board.winner == Some(true) {
-            "Yellow".yellow()
+        let board = tournament.play();
+
+        if board.draw {
+            draws += 1;
+        } else if board.winner == Some(true) {
+            yellow_wins += 1;
         } else {
-            "Blue".blue()
+            blue_wins += 1
         }
-    );
+        println!(
+            "Game {i} Winner: {}",
+            if board.winner == Some(true) {
+                "Yellow".yellow()
+            } else {
+                "Blue".blue()
+            }
+        );
+    }
+
+    println!("Results {}\\{}\\{}", yellow_wins.to_string().yellow(), blue_wins.to_string().blue(), draws.to_string().bold())
 }

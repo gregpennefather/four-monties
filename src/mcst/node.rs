@@ -1,10 +1,10 @@
+use core::fmt::Debug;
 use std::sync::{Arc, Mutex, RwLock, Weak};
 
 use crate::board::{Board, WIDTH};
 
 use super::{playout::PlayoutResult, record::Record};
 
-#[derive(Debug)]
 pub struct NodeContent {
     pub board: Board,
     pub parent: Weak<Self>,
@@ -28,6 +28,38 @@ impl NodeContent {
             record: Default::default(),
             children: RwLock::new(Default::default()),
         }
+    }
+
+    pub fn is_leaf(&self) -> bool {
+        let moves = self.board.get_moves();
+        let children = self.children.read().unwrap();
+        for i in 0..WIDTH {
+            if children[i].is_none() && moves.contains(&i) {
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn get_uninitialized_children(&self) -> Vec<usize> {
+        let mut vec = Vec::new();
+        let children = self.children.read().unwrap();
+        for i in 0..WIDTH {
+            if children[i].is_none() {
+                vec.push(i)
+            }
+        }
+        vec
+    }
+}
+
+impl Debug for NodeContent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Node")
+            .field(&self.board)
+            .field(&self.record.read())
+            .field(&self.is_leaf())
+            .finish()
     }
 }
 
@@ -53,17 +85,20 @@ pub trait Node {
         Self: Sized;
 }
 
-pub fn insert_to_node_index(root: &mut ArcNode, index: usize, board: Board) -> &mut Arc<NodeContent> {
+pub fn insert_to_node_index(
+    root: &mut ArcNode,
+    index: usize,
+    board: Board,
+) -> ArcNode {
     let child = Some(root.new_child(index, board));
     match root.children.try_write() {
-        Ok(mut children) => children[index] = child,
+        Ok(mut children) => children[index] = child.clone(),
         Err(e) => panic!("Err {e:?}!"),
     }
-    root
+    child.unwrap()
 }
 
 impl Node for ArcNode {
-
     fn board(&self) -> Board {
         self.board
     }
@@ -71,7 +106,7 @@ impl Node for ArcNode {
     fn record_result(&mut self, result: PlayoutResult) {
         match self.record.try_write() {
             Ok(mut r) => r.increment(result),
-            Err(e) => panic!("Record result lock error {e:?}")
+            Err(e) => panic!("Record result lock error {e:?}"),
         }
     }
 
@@ -142,6 +177,7 @@ mod test {
         let lock = root.children.read();
         assert!(lock.unwrap()[0].is_some())
     }
+
     #[test]
     pub fn find_child_on_root_returns_root() {
         // Arrange
@@ -157,8 +193,8 @@ mod test {
     #[test]
     pub fn find_child_not_root() {
         // Arrange
-        let board1 = Board::setup(1, 0);
-        let board2 = Board::setup(2, 0);
+        let board1 = Board::setup(1, 0, [0;WIDTH]);
+        let board2 = Board::setup(2, 0, [0;WIDTH]);
         let root = Some(ArcNode::new(NodeContent::new_root(Board::default())));
 
         insert_to_node_index(&mut root.clone().unwrap().clone(), 0, board1);
@@ -170,5 +206,34 @@ mod test {
         // Assert
         assert!(seek.is_some());
         assert_eq!(seek.as_ref().unwrap().board, board2)
+    }
+
+    #[test]
+    pub fn is_leaf_all_children_assigned() {
+        // Arrange
+        let board = Board::default();
+        let root = Some(ArcNode::new(NodeContent::new_root(board)));
+
+        for i in 0..WIDTH {
+            insert_to_node_index(&mut root.clone().unwrap().clone(), i, board.play_move(i));
+        }
+        // Assert
+        assert!(!root.unwrap().is_leaf())
+    }
+
+    #[test]
+    pub fn is_leaf_no_valid_moves_without_children_assigned() {
+        // Arrange
+        let board = Board::setup(558380617816, 4362610851, [2,1,0,1,6,5,4]);
+        let root = Some(ArcNode::new(NodeContent::new_root(board)));
+
+        for i in 0..WIDTH {
+            if i == 4 {
+                continue;
+            }
+            insert_to_node_index(&mut root.clone().unwrap().clone(), i, board.play_move(i));
+        }
+        // Assert
+        assert!(!root.unwrap().is_leaf())
     }
 }

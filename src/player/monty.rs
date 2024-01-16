@@ -1,4 +1,4 @@
-use crate::{mcst::SearchTree, board::Board};
+use crate::{mcst::{SearchTree, node::Node}, board::Board};
 
 use super::Player;
 
@@ -16,9 +16,11 @@ impl Monty {
 
 impl Player for Monty {
     fn select_move(&mut self, board: Board) -> usize {
-        self.search_tree.produce_move(board);
-        let moves = board.get_moves();
-        moves[0]
+        for i in 0..100 {
+            self.search_tree.iterate(board);
+        }
+
+        self.search_tree.select_move()
     }
 
     fn record_move(&mut self, index: usize, board: Board) -> Board {
