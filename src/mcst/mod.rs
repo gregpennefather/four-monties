@@ -53,9 +53,9 @@ impl SearchTree {
                 Some(c) => {
                     // Else rank moves by simulation count
                     let played = c.record.read().unwrap().played as usize;
-                    let result = c.result.read().unwrap();
+                    let result = c.result.get();
 
-                    println!("Played+Result {i}: {played} - {result:?}", );
+                    println!("Played+Result {i}: {played} - {result:?}",);
                 }
                 None => println!("{i}: not explored"),
             };
@@ -65,26 +65,25 @@ impl SearchTree {
 
     pub fn select_move(&self) -> usize {
         let children = self.root.children.read().unwrap();
-        let yellow_turn = self.root.board().yellow_turn;
         let mut m: Option<usize> = None;
         let mut m_s = i64::MIN;
         for i in 0..WIDTH {
             let r = match children[i].clone() {
                 Some(c) => {
                     // If move is a winner pick it
-                    match c.result.try_read() {
-                        Ok(r) => {
-                            if r.is_some() {
-                                match r.unwrap() {
-                                    GameResult::YellowWin => if yellow_turn { return i } else { -2 },
-                                    GameResult::BlueWin => if !yellow_turn { return i } else { -2 },
-                                    GameResult::Draw => 0,
+                    let r = c.result.get();
+                    match r {
+                        Some(r) => match r {
+                            GameResult::Win(winner) => {
+                                if *winner == self.root.board().active_player {
+                                    return i;
+                                } else {
+                                    -2
                                 }
-                            } else {
-                                c.record.read().unwrap().played as i64
                             }
-                        }
-                        Err(e) => panic!("{e}"),
+                            GameResult::Draw => 0,
+                        },
+                        None => c.record.read().unwrap().played as i64,
                     }
                 }
                 None => i64::MIN,
@@ -100,7 +99,6 @@ impl SearchTree {
             panic!("no valid move found for node {:?}", self.root);
         }
         m.unwrap()
-
     }
 
     pub fn iterate(&mut self) {
@@ -161,18 +159,18 @@ impl SearchTree {
         let selected_move = options[rand_index];
         let new_state = leaf.board().play_move(selected_move);
         let new_arc_node = insert_to_node_index(&mut leaf, selected_move, new_state);
-        match new_arc_node.result.try_read() {
-            Ok(r) => {
-                if r.is_some() {
-                    if r.unwrap() == GameResult::YellowWin && leaf.board().yellow_turn || r.unwrap() == GameResult::BlueWin && !leaf.board().yellow_turn {
-                        match leaf.result.try_write() {
-                            Ok(mut w) => *w = *r,
-                            Err(e) => panic!("{e}")
+        match new_arc_node.result.get() {
+            Some(r) => {
+                match r {
+                    GameResult::Win(winner) => {
+                        if *winner == leaf.board().active_player {
+                            leaf.result.set(*r);
                         }
                     }
+                    GameResult::Draw => (), // TODO: Maybe we need to prop draws up?
                 }
             }
-            Err(e) => panic!("{e}"),
+            None => (),
         }
 
         new_arc_node.clone()
@@ -180,7 +178,7 @@ impl SearchTree {
 
     pub fn simulation(&mut self, leaf: ArcNode) -> GameResult {
         let board = leaf.clone().board();
-        playout::from(board).fair_result()
+        playout::from(board).fair_random_result()
     }
 }
 
@@ -193,7 +191,7 @@ pub fn backpropagation(mut leaf: ArcNode, result: GameResult) {
 }
 
 fn traverse_tree_ucb(node: ArcNode, parent_sims: f32, depth: usize) -> (Option<ArcNode>, f32) {
-    if node.clone().board().result.is_some() {
+    if node.clone().board().winner.is_some() {
         (None, f32::MIN)
     } else if node.clone().is_leaf() {
         (

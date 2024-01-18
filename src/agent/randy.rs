@@ -1,11 +1,11 @@
 use crate::game::board::Board;
 
-use super::Player;
+use super::Agent;
 use rand::RngCore;
 
 pub struct Randy;
 
-impl Player for Randy {
+impl Agent for Randy {
     fn select_move(&mut self, board: crate::game::board::Board) -> usize {
         let mut rand = rand::thread_rng();
 

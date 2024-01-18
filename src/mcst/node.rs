@@ -1,8 +1,12 @@
 use core::fmt::Debug;
-use std::sync::{Arc, Mutex, RwLock, Weak};
+use std::{
+    cell::OnceCell,
+    sync::{Arc, Mutex, RwLock, Weak},
+};
 
 use crate::game::{
     board::{Board, WIDTH},
+    player::Player,
     result::GameResult,
 };
 
@@ -13,7 +17,7 @@ pub struct NodeContent {
     pub parent: Weak<Self>,
     pub record: RwLock<Record>,
     pub children: RwLock<[Link; 7]>,
-    pub result: RwLock<Option<GameResult>>,
+    pub result: OnceCell<GameResult>,
 }
 
 impl NodeContent {
@@ -23,16 +27,23 @@ impl NodeContent {
             parent: Weak::new(),
             record: Default::default(),
             children: RwLock::new(Default::default()),
-            result: RwLock::new(Default::default()),
+            result: OnceCell::new(),
         }
     }
     pub(super) fn new_child(parent_ptr: Weak<Self>, board: Board) -> Self {
+        let result = OnceCell::new();
+        if let Some(winner) = board.winner {
+            result.set(match winner {
+                Player::Yellow | Player::Blue => GameResult::Win(winner),
+                Player::NoPlayer => GameResult::Draw,
+            });
+        }
         NodeContent {
             board: board,
             parent: parent_ptr,
             record: Default::default(),
             children: RwLock::new(Default::default()),
-            result: RwLock::new(board.result),
+            result,
         }
     }
 
@@ -120,10 +131,8 @@ impl Node for ArcNode {
     }
 
     fn record_result(&mut self, result: GameResult) {
-        let yellow_is_active_player = self.board().yellow_turn;
         let win = match result {
-            GameResult::YellowWin => yellow_is_active_player == true,
-            GameResult::BlueWin => yellow_is_active_player == false,
+            GameResult::Win(winner) => winner == self.board().active_player,
             GameResult::Draw => panic!("attempting to record a draw"),
         };
         match self.record.try_write() {

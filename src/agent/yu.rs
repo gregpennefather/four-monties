@@ -2,12 +2,12 @@ use std::{io::{self, stdin}, f32::consts::E};
 
 use crate::game::board::Board;
 
-use super::Player;
+use super::Agent;
 use rand::RngCore;
 
 pub struct Yu;
 
-impl Player for Yu {
+impl Agent for Yu {
     fn select_move(&mut self, board: crate::game::board::Board) -> usize {
         let moves = board.get_moves();
         board.print_board();

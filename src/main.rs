@@ -3,9 +3,9 @@ use std::default;
 use crate::{
     game::{
         board::{Board, WIDTH},
-        result::GameResult,
+        result::GameResult, player::Player,
     },
-    player::{monty::Monty, randy::Randy, yu::Yu},
+    agent::{monty::Monty, randy::Randy, yu::Yu},
     tournament::Tournament,
 };
 use colored::Colorize;
@@ -13,7 +13,7 @@ use rand::RngCore;
 
 mod game;
 mod mcst;
-mod player;
+mod agent;
 mod tournament;
 
 fn main() {
@@ -28,20 +28,20 @@ fn main() {
 
         let board = tournament.play();
 
-        match board.result {
+        match board.winner {
             Some(r) => println!(
                 "Game {i} Result: {} (Turn {})",
                 match r {
-                    GameResult::Draw => {
+                    Player::NoPlayer => {
                         draws += 1;
                         "Draw".to_string()
                     }
-                    GameResult::YellowWin => {
+                    Player::Yellow => {
                         yellow_wins += 1;
                         yellow_win_aggregate_turns += board.turn;
                         "Yellow Wins".yellow().to_string()
                     }
-                    GameResult::BlueWin => {
+                    Player::Blue => {
                         blue_wins += 1;
                         blue_win_aggregate_turns += board.turn;
                         "Blue Wins".blue().to_string()

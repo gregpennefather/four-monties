@@ -1,18 +1,27 @@
+use core::fmt;
+
+use super::player::Player;
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum GameResult {
-    YellowWin,
+    Win(Player),
     Draw,
-    BlueWin,
+}
+
+impl fmt::Display for GameResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 impl GameResult {
-    pub fn fair_result(&self) -> Self {
+    pub fn fair_random_result(&self) -> Self {
         match self {
-            GameResult::YellowWin => GameResult::YellowWin,
-            GameResult::BlueWin => GameResult::BlueWin,
-            GameResult::Draw => match rand::random() {
-                true => GameResult::YellowWin,
-                false => GameResult::BlueWin,
+            GameResult::Win(Player::Yellow) => GameResult::Win(Player::Yellow),
+            GameResult::Win(Player::Blue) => GameResult::Win(Player::Blue),
+            GameResult::Win(Player::NoPlayer) | GameResult::Draw => match rand::random() {
+                true => GameResult::Win(Player::Yellow),
+                false => GameResult::Win(Player::Blue),
             },
         }
     }

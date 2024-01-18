@@ -3,7 +3,7 @@ use crate::{
     mcst::{node::Node, SearchTree},
 };
 
-use super::Player;
+use super::Agent;
 
 pub struct Monty {
     search_tree: SearchTree,
@@ -17,7 +17,7 @@ impl Monty {
     }
 }
 
-impl Player for Monty {
+impl Agent for Monty {
     fn select_move(&mut self, board: Board) -> usize {
         // self.search_tree.print_state();
 

@@ -2,7 +2,7 @@ use colored::Colorize;
 use core::fmt::Debug;
 use log::debug;
 
-use super::result::GameResult;
+use super::player::Player;
 
 pub const WIDTH: usize = 7;
 pub const HEIGHT: usize = 6;
@@ -13,8 +13,8 @@ pub struct Board {
     pub yellow_bb: u64,
     pub blue_bb: u64,
     pub column_pieces: [usize; WIDTH],
-    pub yellow_turn: bool,
-    pub result: Option<GameResult>,
+    pub active_player: Player,
+    pub winner: Option<Player>,
     pub turn: u32
 }
 
@@ -30,8 +30,8 @@ impl Default for Board {
             yellow_bb: 0,
             blue_bb: 0,
             column_pieces: [0; WIDTH],
-            yellow_turn: true,
-            result: None,
+            active_player: Player::Yellow,
+            winner: None,
             turn: 0
         }
     }
@@ -40,9 +40,10 @@ impl Default for Board {
 impl Debug for Board {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("Board")
+            .field(&self.active_player)
             .field(&self.yellow_bb)
             .field(&self.blue_bb)
-            .field(&self.result)
+            .field(&self.winner)
             .finish()
     }
 }
@@ -69,39 +70,34 @@ impl Board {
         let row = self.column_pieces[column];
         let index = row * WIDTH + column; // Double check this
         if index >= MAX_INDEX {
-            println!("attempting to play move: {column} in state {self:?} for {}", if self.yellow_turn { "Yellow" } else { "Blue" });
+            println!("attempting to play move: {column} in state {self:?}");
             self.print_board();
             println!("{:?}", self.get_moves());
             println!("{:?}", self.column_pieces);
             panic!("invalid move {column}");
         }
-        let is_yellow = self.yellow_turn;
-        if self.yellow_turn {
+        if self.active_player == Player::Yellow {
             n_b.yellow_bb ^= 1 << index;
         } else {
             n_b.blue_bb ^= 1 << index;
         }
         n_b.column_pieces[column] += 1;
-        n_b.yellow_turn = !self.yellow_turn;
+        n_b.update_winner(index);
+        n_b.active_player = self.active_player.invert();
         n_b.turn += 1;
-        n_b.update_winner(index, is_yellow);
         n_b
     }
 
-    fn update_winner(&mut self, index: usize, yellow_player: bool) {
-        let bb = if yellow_player {
-            self.yellow_bb
-        } else {
-            self.blue_bb
+    fn update_winner(&mut self, index: usize) {
+        let bb = match self.active_player {
+            Player::Yellow => self.yellow_bb,
+            Player::Blue => self.blue_bb,
+            Player::NoPlayer => panic!("Board Active Player should never be {}", Player::NoPlayer)
         };
 
         debug!(
             "checking winner {} : v{}/h{}/d{}",
-            if yellow_player {
-                "Yellow".yellow()
-            } else {
-                "Blue".blue()
-            },
+            self.active_player,
             check_vertical(bb, index),
             check_horizontal(bb, index),
             check_diagonals(bb, index)
@@ -111,14 +107,11 @@ impl Board {
                 || check_horizontal(bb, index)
                 || check_diagonals(bb, index))
         {
-            self.result = Some(match yellow_player {
-                true => GameResult::YellowWin,
-                false => GameResult::BlueWin,
-            })
+            self.winner = Some(self.active_player)
         }
 
-        if self.result.is_none() && self.get_moves().len() == 0 {
-            self.result = Some(GameResult::Draw)
+        if self.winner.is_none() && self.get_moves().len() == 0 {
+            self.winner = Some(Player::NoPlayer)
         }
     }
 
@@ -148,9 +141,9 @@ impl Board {
         Self {
             yellow_bb: yellow_bb,
             blue_bb: blue_bb,
-            yellow_turn: blue_bb.count_ones() == yellow_bb.count_ones(),
+            active_player: if blue_bb.count_ones() == yellow_bb.count_ones() { Player::Yellow } else { Player::Blue },
             column_pieces,
-            result: None,
+            winner: None,
             turn: yellow_bb.count_ones() + blue_bb.count_ones() + 1
         }
     }
@@ -454,6 +447,6 @@ mod test {
         let r = b.play_move(6);
 
         // Assert
-        assert_eq!(r.result, Some(GameResult::Draw));
+        assert_eq!(r.winner, Some(Player::NoPlayer));
     }
 }

@@ -1,14 +1,14 @@
 use colored::Colorize;
 
-use crate::{player::Player, game::board::Board};
+use crate::{agent::Agent, game::{board::Board, player::Player}};
 
 pub struct Tournament {
-    yellow_player: Box<dyn Player>,
-    blue_player: Box<dyn Player>,
+    yellow_player: Box<dyn Agent>,
+    blue_player: Box<dyn Agent>,
 }
 
 impl Tournament {
-    pub fn new(yellow_player: Box<dyn Player>, blue_player: Box<dyn Player>) -> Self {
+    pub fn new(yellow_player: Box<dyn Agent>, blue_player: Box<dyn Agent>) -> Self {
         Self {
             yellow_player,
             blue_player,
@@ -20,7 +20,7 @@ impl Tournament {
         let mut m_count = 0;
 
         loop {
-            let selected_move = if board.yellow_turn {
+            let selected_move = if board.active_player == Player::Yellow {
                 self.yellow_player.select_move(board)
             } else {
                 self.blue_player.select_move(board)
@@ -41,7 +41,7 @@ impl Tournament {
             //     }
             // );
 
-            if board.result.is_some() {
+            if board.winner.is_some() {
                 break;
             }
         }
