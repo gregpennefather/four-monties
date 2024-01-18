@@ -1,12 +1,17 @@
+use std::default;
+
 use crate::{
-    board::{Board, WIDTH},
+    game::{
+        board::{Board, WIDTH},
+        result::GameResult,
+    },
     player::{monty::Monty, randy::Randy, yu::Yu},
     tournament::Tournament,
 };
 use colored::Colorize;
 use rand::RngCore;
 
-mod board;
+mod game;
 mod mcst;
 mod player;
 mod tournament;
@@ -18,31 +23,44 @@ fn main() {
     // b.print_board();
     // return;
 
+    let b = Board::setup(7, 352, Default::default());
+    b.print_board();
+
     let mut yellow_wins = 0;
     let mut blue_wins = 0;
     let mut draws = 0;
-    for i in 0..1000 {
+    for i in 0..100 {
         let board = Board::default();
-        let mut tournament = Tournament::new(Box::new(Monty::new(board)), Box::new(Randy));
+        let mut tournament = Tournament::new(Box::new(Yu), Box::new(Yu));
 
         let board = tournament.play();
 
-        if board.draw {
-            draws += 1;
-        } else if board.winner == Some(true) {
-            yellow_wins += 1;
-        } else {
-            blue_wins += 1
+        match board.result {
+            Some(r) => println!(
+                "Game {i} Result: {}",
+                match r {
+                    GameResult::Draw => {
+                        draws += 1;
+                        "Draw".to_string()
+                    }
+                    GameResult::YellowWin => {
+                        yellow_wins += 1;
+                        "Yellow Wins".yellow().to_string()
+                    }
+                    GameResult::BlueWin => {
+                        blue_wins += 1;
+                        "Blue Wins".blue().to_string()
+                    }
+                }
+            ),
+            None => (),
         }
-        println!(
-            "Game {i} Winner: {}",
-            if board.winner == Some(true) {
-                "Yellow".yellow()
-            } else {
-                "Blue".blue()
-            }
-        );
     }
 
-    println!("Results {}\\{}\\{}", yellow_wins.to_string().yellow(), blue_wins.to_string().blue(), draws.to_string().bold())
+    println!(
+        "Results {}\\{}\\{}",
+        yellow_wins.to_string().yellow(),
+        blue_wins.to_string().blue(),
+        draws.to_string().bold()
+    )
 }

@@ -1,4 +1,4 @@
-use crate::board::Board;
+use crate::game::board::Board;
 
 use super::Player;
 use rand::RngCore;
@@ -6,7 +6,7 @@ use rand::RngCore;
 pub struct Randy;
 
 impl Player for Randy {
-    fn select_move(&mut self, board: crate::board::Board) -> usize {
+    fn select_move(&mut self, board: crate::game::board::Board) -> usize {
         let mut rand = rand::thread_rng();
 
         let moves = board.get_moves();
@@ -14,7 +14,7 @@ impl Player for Randy {
         moves[rand_index]
     }
 
-    fn record_move(&mut self, index: usize, board: Board) -> crate::board::Board {
+    fn record_move(&mut self, index: usize, board: Board) -> crate::game::board::Board {
         board
     }
 }

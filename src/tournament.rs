@@ -1,6 +1,6 @@
 use colored::Colorize;
 
-use crate::{board::Board, player::Player};
+use crate::{player::Player, game::board::Board};
 
 pub struct Tournament {
     yellow_player: Box<dyn Player>,
@@ -41,7 +41,7 @@ impl Tournament {
             //     }
             // );
 
-            if board.draw || board.winner.is_some() {
+            if board.result.is_some() {
                 break;
             }
         }

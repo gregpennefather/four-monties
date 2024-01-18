@@ -1,4 +1,4 @@
-use crate::board::Board;
+use crate::game::board::Board;
 
 pub mod monty;
 pub mod randy;

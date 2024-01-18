@@ -2,6 +2,8 @@ use colored::Colorize;
 use core::fmt::Debug;
 use log::debug;
 
+use super::result::GameResult;
+
 pub const WIDTH: usize = 7;
 pub const HEIGHT: usize = 6;
 
@@ -11,9 +13,7 @@ pub struct Board {
     pub blue_bb: u64,
     pub column_pieces: [usize; WIDTH],
     pub yellow_turn: bool,
-    pub winner: Option<bool>,
-    pub draw: bool,
-    pub complete: bool
+    pub result: Option<GameResult>,
 }
 
 impl PartialEq for Board {
@@ -29,9 +29,7 @@ impl Default for Board {
             blue_bb: 0,
             column_pieces: [0; WIDTH],
             yellow_turn: true,
-            winner: None,
-            draw: false,
-            complete: false
+            result: None,
         }
     }
 }
@@ -41,7 +39,7 @@ impl Debug for Board {
         f.debug_tuple("Board")
             .field(&self.yellow_bb)
             .field(&self.blue_bb)
-            .field(&self.complete)
+            .field(&self.result)
             .finish()
     }
 }
@@ -102,13 +100,14 @@ impl Board {
                 || check_horizontal(bb, index)
                 || check_diagonals(bb, index))
         {
-            self.winner = Some(yellow_player);
-            self.complete = true;
+            self.result = Some(match yellow_player {
+                true => GameResult::YellowWin,
+                false => GameResult::BlueWin,
+            })
         }
 
-        if self.winner == None && self.get_moves().len() == 0 {
-            self.draw = true;
-            self.complete = true;
+        if self.result.is_none() && self.get_moves().len() == 0 {
+            self.result = Some(GameResult::Draw)
         }
     }
 
@@ -140,9 +139,7 @@ impl Board {
             blue_bb: blue_bb,
             yellow_turn: blue_bb.count_ones() == yellow_bb.count_ones(),
             column_pieces,
-            winner: None,
-            draw: false,
-            complete: false
+            result: None,
         }
     }
 }
@@ -244,8 +241,6 @@ fn check_vertical(bb: u64, index: usize) -> bool {
 
 #[cfg(test)]
 mod test {
-    use crate::board::check_vertical;
-
     use super::*;
 
     #[test]
@@ -447,6 +442,6 @@ mod test {
         let r = b.play_move(6);
 
         // Assert
-        assert!(r.draw);
+        assert_eq!(r.result, Some(GameResult::Draw));
     }
 }

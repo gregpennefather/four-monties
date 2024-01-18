@@ -1,15 +1,19 @@
 use core::fmt::Debug;
 use std::sync::{Arc, Mutex, RwLock, Weak};
 
-use crate::board::{Board, WIDTH};
+use crate::game::{
+    board::{Board, WIDTH},
+    result::GameResult,
+};
 
-use super::{playout::PlayoutResult, record::Record};
+use super::record::Record;
 
 pub struct NodeContent {
     pub board: Board,
     pub parent: Weak<Self>,
     pub record: RwLock<Record>,
     pub children: RwLock<[Link; 7]>,
+    pub result: RwLock<Option<GameResult>>,
 }
 
 impl NodeContent {
@@ -19,6 +23,7 @@ impl NodeContent {
             parent: Weak::new(),
             record: Default::default(),
             children: RwLock::new(Default::default()),
+            result: RwLock::new(Default::default()),
         }
     }
     pub(super) fn new_child(parent_ptr: Weak<Self>, board: Board) -> Self {
@@ -27,6 +32,7 @@ impl NodeContent {
             parent: parent_ptr,
             record: Default::default(),
             children: RwLock::new(Default::default()),
+            result: RwLock::new(board.result),
         }
     }
 
@@ -55,6 +61,20 @@ impl NodeContent {
 
 impl Debug for NodeContent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // let win = match self.result.try_read() {
+        //     Ok(r) => {
+        //         if r.is_some() {
+        //             let o = r.unwrap();
+        //             format!(
+        //                 "Winner: {o}"
+        //             )
+        //         } else {
+        //             "Incomplete".to_string()
+        //         }
+        //     }
+
+        //     Err(e) => panic!("{e}"),
+        // };
         f.debug_tuple("Node")
             .field(&self.board)
             .field(&self.record.read())
@@ -78,18 +98,14 @@ pub type Link = Option<ArcNode>;
 
 pub trait Node {
     fn board(&self) -> Board;
-    fn record_result(&mut self, result: PlayoutResult);
+    fn record_result(&mut self, result: GameResult);
     fn new_child(&self, index: usize, board: Board) -> Self;
     fn seek(self, board: Board) -> Option<Self>
     where
         Self: Sized;
 }
 
-pub fn insert_to_node_index(
-    root: &mut ArcNode,
-    index: usize,
-    board: Board,
-) -> ArcNode {
+pub fn insert_to_node_index(root: &mut ArcNode, index: usize, board: Board) -> ArcNode {
     let child = Some(root.new_child(index, board));
     match root.children.try_write() {
         Ok(mut children) => children[index] = child.clone(),
@@ -103,9 +119,15 @@ impl Node for ArcNode {
         self.board
     }
 
-    fn record_result(&mut self, result: PlayoutResult) {
+    fn record_result(&mut self, result: GameResult) {
+        let yellow_is_active_player = self.board().yellow_turn;
+        let win = match result {
+            GameResult::YellowWin => yellow_is_active_player == true,
+            GameResult::BlueWin => yellow_is_active_player == false,
+            GameResult::Draw => panic!("attempting to record a draw"),
+        };
         match self.record.try_write() {
-            Ok(mut r) => r.increment(result),
+            Ok(mut r) => r.increment(win),
             Err(e) => panic!("Record result lock error {e:?}"),
         }
     }
@@ -193,8 +215,8 @@ mod test {
     #[test]
     pub fn find_child_not_root() {
         // Arrange
-        let board1 = Board::setup(1, 0, [0;WIDTH]);
-        let board2 = Board::setup(2, 0, [0;WIDTH]);
+        let board1 = Board::setup(1, 0, [0; WIDTH]);
+        let board2 = Board::setup(2, 0, [0; WIDTH]);
         let root = Some(ArcNode::new(NodeContent::new_root(Board::default())));
 
         insert_to_node_index(&mut root.clone().unwrap().clone(), 0, board1);
@@ -224,7 +246,7 @@ mod test {
     #[test]
     pub fn is_leaf_no_valid_moves_without_children_assigned() {
         // Arrange
-        let board = Board::setup(558380617816, 4362610851, [2,1,0,1,6,5,4]);
+        let board = Board::setup(558380617816, 4362610851, [2, 1, 0, 1, 6, 5, 4]);
         let root = Some(ArcNode::new(NodeContent::new_root(board)));
 
         for i in 0..WIDTH {

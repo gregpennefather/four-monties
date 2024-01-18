@@ -1,15 +1,18 @@
-use crate::{mcst::{SearchTree, node::Node}, board::Board};
+use crate::{
+    game::board::Board,
+    mcst::{node::Node, SearchTree},
+};
 
 use super::Player;
 
 pub struct Monty {
-    search_tree: SearchTree
+    search_tree: SearchTree,
 }
 
 impl Monty {
     pub fn new(board: Board) -> Self {
         Self {
-            search_tree: SearchTree::new(board)
+            search_tree: SearchTree::new(board),
         }
     }
 }
@@ -18,9 +21,8 @@ impl Player for Monty {
     fn select_move(&mut self, board: Board) -> usize {
         // self.search_tree.print_state();
 
-
-        for i in 0..1000 {
-            self.search_tree.iterate(board);
+        for i in 0..10000 {
+            self.search_tree.iterate();
         }
 
         // self.search_tree.print_state();

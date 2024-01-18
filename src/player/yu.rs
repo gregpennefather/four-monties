@@ -1,6 +1,6 @@
 use std::{io::{self, stdin}, f32::consts::E};
 
-use crate::board::Board;
+use crate::game::board::Board;
 
 use super::Player;
 use rand::RngCore;
@@ -8,9 +8,10 @@ use rand::RngCore;
 pub struct Yu;
 
 impl Player for Yu {
-    fn select_move(&mut self, board: crate::board::Board) -> usize {
+    fn select_move(&mut self, board: crate::game::board::Board) -> usize {
         let moves = board.get_moves();
         board.print_board();
+        println!("{board:?}");
         println!("Select move : {moves:?}");
         let mut entry = String::new();
         loop {
@@ -22,7 +23,7 @@ impl Player for Yu {
         }
     }
 
-    fn record_move(&mut self, index: usize, board: Board) -> crate::board::Board {
+    fn record_move(&mut self, index: usize, board: Board) -> crate::game::board::Board {
         board
     }
 }

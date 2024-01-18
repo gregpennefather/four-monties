@@ -7,20 +7,19 @@ use colored::Colorize;
 use rand::RngCore;
 
 use crate::{
-    board::{Board, WIDTH},
+    game::board::{Board, WIDTH},
+    game::result::GameResult,
     mcst::node::insert_to_node_index,
 };
 
-use self::{
-    node::{ArcNode, Link, Node, NodeContent},
-    playout::PlayoutResult,
-};
+use self::node::{ArcNode, Link, Node, NodeContent};
 
 static EXPLORATION_CONSTANT: f32 = SQRT_2;
 
 pub mod node;
 mod playout;
 mod record;
+mod tests;
 
 pub struct SearchTree {
     pub root: ArcNode,
@@ -53,9 +52,10 @@ impl SearchTree {
             let r = match children[i].clone() {
                 Some(c) => {
                     // Else rank moves by simulation count
-                    let r = c.record.read().unwrap().played as usize;
+                    let played = c.record.read().unwrap().played as usize;
+                    let result = c.result.read().unwrap();
 
-                    println!("{i}: {r} - {:?}", c.board.winner);
+                    println!("Played+Result {i}: {played} - {result:?}", );
                 }
                 None => println!("{i}: not explored"),
             };
@@ -65,20 +65,32 @@ impl SearchTree {
 
     pub fn select_move(&self) -> usize {
         let children = self.root.children.read().unwrap();
+        let yellow_turn = self.root.board().yellow_turn;
         let mut m = 0;
         let mut m_s = 0;
         for i in 0..WIDTH {
             let r = match children[i].clone() {
                 Some(c) => {
                     // If move is a winner pick it
-                    if c.board().winner == Some(self.root.board.yellow_turn) {
-                        return i;
+                    match c.result.try_read() {
+                        Ok(r) => {
+                            if r.is_some() {
+                                println!("evaluating winning move {i}: {r:?} for {} turn", if yellow_turn { "Yellow" } else { "Blue"});
+                                match r.unwrap() {
+                                    GameResult::YellowWin => if yellow_turn { return i } else { 0 },
+                                    GameResult::BlueWin => if !yellow_turn { return i } else { 0 },
+                                    GameResult::Draw => 0,
+                                }
+                            } else {
+                                c.record.read().unwrap().played as usize
+                            }
+                        }
+                        Err(e) => panic!("{e}"),
                     }
-                    // Else rank moves by simulation count
-                    c.record.read().unwrap().played as usize
                 }
                 None => 0,
             };
+            println!("r {r} vs {m_s}");
             if r > m_s {
                 m = i;
                 m_s = r
@@ -87,27 +99,29 @@ impl SearchTree {
         m
     }
 
-    pub fn iterate(&mut self, board_state: Board) {
-        // let leaf = self.root.select();
-        if self.root.clone().board() != board_state {
-            self.root.board().print_board();
-            board_state.print_board();
-            panic!("Unexpected state!");
+    pub fn iterate(&mut self) {
+        let selection = self.selection();
+
+        if selection.is_none() {
+            println!("No expansion for root {:?}", self.root);
+            return;
         }
 
-        let selection = self.selection();
-        let new_leaf = self.expansion(selection.clone());
+        let new_leaf = self.expansion(selection.clone().unwrap());
         let sim_result = self.simulation(new_leaf.clone());
         backpropagation(new_leaf.clone(), sim_result);
     }
 
-    pub fn selection(&self) -> ArcNode {
+    pub fn selection(&self) -> Option<ArcNode> {
         let root = self.root.clone();
         let root_sims = root.record.read().unwrap().played as f32;
         let (selected, score) = traverse_tree_ucb(root.clone(), root_sims, 0);
 
+        // println!("Selected {selected:?} with score {score}");
+
         if selected.is_none() {
             println!("No valid expansion for root {root:?}");
+            return None;
         }
 
         if !selected.clone().unwrap().is_leaf() {
@@ -123,10 +137,7 @@ impl SearchTree {
             );
             panic!("Selected is not leaf! {selected:?} score {score}");
         }
-        match selected {
-            Some(n) => n,
-            None => self.root.clone(),
-        }
+        selected
     }
 
     pub fn expansion(&mut self, mut leaf: ArcNode) -> ArcNode {
@@ -147,36 +158,49 @@ impl SearchTree {
         let selected_move = options[rand_index];
         let new_state = leaf.board().play_move(selected_move);
         let new_arc_node = insert_to_node_index(&mut leaf, selected_move, new_state);
+        match new_arc_node.result.try_read() {
+            Ok(r) => {
+                if r.is_some() {
+                    println!(
+                        "Expanded new complete node {new_arc_node:?} after {} move",
+                        if leaf.board().yellow_turn {
+                            "Yellow"
+                        } else {
+                            "Blue"
+                        }
+                    );
+
+                    if r.unwrap() == GameResult::YellowWin && leaf.board().yellow_turn || r.unwrap() == GameResult::BlueWin && !leaf.board().yellow_turn {
+                        println!("Winner discovered for leaf: {leaf:?}");
+                        match leaf.result.try_write() {
+                            Ok(mut w) => *w = *r,
+                            Err(e) => panic!("{e}")
+                        }
+                    }
+                }
+            }
+            Err(e) => panic!("{e}"),
+        }
 
         new_arc_node.clone()
     }
 
-    pub fn simulation(&mut self, leaf: ArcNode) -> PlayoutResult {
+    pub fn simulation(&mut self, leaf: ArcNode) -> GameResult {
         let board = leaf.clone().board();
-        if let Some(winner) = board.winner {
-            return if winner == board.yellow_turn {
-                PlayoutResult::Win
-            } else {
-                PlayoutResult::Loss
-            };
-        }
-        if board.draw {
-            return PlayoutResult::Draw.fair_result();
-        }
         playout::from(board).fair_result()
     }
 }
 
-pub fn backpropagation(mut leaf: ArcNode, result: PlayoutResult) {
+pub fn backpropagation(mut leaf: ArcNode, result: GameResult) {
     leaf.record_result(result);
     match leaf.parent.upgrade() {
-        Some(l) => backpropagation(l, result.invert()),
+        Some(l) => backpropagation(l, result),
         None => {}
     }
 }
 
 fn traverse_tree_ucb(node: ArcNode, parent_sims: f32, depth: usize) -> (Option<ArcNode>, f32) {
-    if node.clone().board().complete {
+    if node.clone().board().result.is_some() {
         (None, f32::MIN)
     } else if node.clone().is_leaf() {
         (
@@ -220,7 +244,7 @@ fn calculate_node_uctb(node: ArcNode, parent_sims: f32) -> f32 {
 #[cfg(test)]
 mod test {
     use crate::{
-        board::Board,
+        game::board::Board,
         mcst::{
             node::{ArcNode, NodeContent},
             SearchTree,

@@ -1,26 +1,19 @@
 use std::fmt::Write;
 
-use crate::board::Board;
+use crate::game::{board::Board, result::GameResult};
 use rand::RngCore;
 
-#[derive(Clone, Copy, Debug)]
-pub enum PlayoutResult {
-    Win,
-    Draw,
-    Loss,
-}
-
-impl std::fmt::Display for PlayoutResult {
+impl std::fmt::Display for GameResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
-            PlayoutResult::Win => "Win",
-            PlayoutResult::Loss => "Loss",
-            PlayoutResult::Draw => "Draw",
+            GameResult::YellowWin => "Yellow",
+            GameResult::BlueWin => "Blue",
+            GameResult::Draw => "Draw",
         })
     }
 }
 
-pub fn from(mut board: Board) -> PlayoutResult {
+pub fn from(mut board: Board) -> GameResult {
     if board.get_moves().len() == 0 {
         println!("Trying to simulate state with no moves: {board:?}");
     }
@@ -37,41 +30,10 @@ pub fn from(mut board: Board) -> PlayoutResult {
         let rand_index: usize = rand.next_u64() as usize % moves.len();
         board = board.play_move(moves[rand_index]);
 
-        if board.draw {
-            return PlayoutResult::Draw;
-        }
-
-        match board.winner {
-            Some(winner) => {
-                return if winner != current_player_yellow {
-                    PlayoutResult::Loss
-                } else {
-                    PlayoutResult::Win
-                };
-            }
+        match board.result {
+            Some(result) => return result,
             None => continue,
         }
     }
-    return PlayoutResult::Draw;
-}
-
-impl PlayoutResult {
-    pub fn invert(&self) -> Self {
-        match self {
-            PlayoutResult::Win => PlayoutResult::Loss,
-            PlayoutResult::Draw => panic!("Attempting to invert a PlayerResult::Draw"),
-            PlayoutResult::Loss => PlayoutResult::Win,
-        }
-    }
-
-    pub fn fair_result(&self) -> Self {
-        match self {
-            PlayoutResult::Win => PlayoutResult::Win,
-            PlayoutResult::Loss => PlayoutResult::Loss,
-            PlayoutResult::Draw => match rand::random() {
-                true => PlayoutResult::Win,
-                false => PlayoutResult::Loss,
-            },
-        }
-    }
+    return GameResult::Draw;
 }

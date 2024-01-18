@@ -1,4 +1,4 @@
-use super::playout::PlayoutResult;
+use crate::game::result::GameResult;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Record {
@@ -7,10 +7,10 @@ pub struct Record {
 }
 
 impl Record {
-    pub fn increment(&mut self, result: PlayoutResult) {
+    pub fn increment(&mut self, win: bool) {
         self.played += 1;
-        self.wins += match result {
-            PlayoutResult::Win => 1,
+        self.wins += match win {
+            true => 1,
             _ => 0,
         }
     }
