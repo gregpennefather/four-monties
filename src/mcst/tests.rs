@@ -10,7 +10,7 @@ pub fn winning_move_possible() {
         tree.iterate();
     }
 
-    let m = tree.select_move();
+    let m = tree.choose_move();
 
     // Assert
     assert_eq!(m, 3);
@@ -30,7 +30,7 @@ pub fn opponent_can_win_next_move_should_block() {
     tree.print_state();
     b.print_board();
 
-    let m = tree.select_move();
+    let m = tree.choose_move();
 
     // Assert
     assert_eq!(m, 3);
@@ -50,7 +50,7 @@ pub fn opponent_can_win_next_move_should_but_so_can_player_should_win() {
     tree.print_state();
     b.print_board();
 
-    let m = tree.select_move();
+    let m = tree.choose_move();
 
     // Assert
     assert_eq!(m, 0);

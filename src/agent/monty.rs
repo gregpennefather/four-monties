@@ -26,7 +26,7 @@ impl Agent for Monty {
         }
 
         // self.search_tree.print_state();
-        self.search_tree.select_move()
+        self.search_tree.choose_move()
     }
 
     fn record_move(&mut self, index: usize, board: Board) -> Board {

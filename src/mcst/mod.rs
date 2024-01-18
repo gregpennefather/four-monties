@@ -1,18 +1,21 @@
 use std::{
     f32::consts::{E, SQRT_2},
-    sync::Arc,
+    sync::{Arc, RwLock},
 };
 
 use colored::Colorize;
+use log::debug;
 use rand::RngCore;
 
 use crate::{
     game::board::{Board, WIDTH},
     game::result::GameResult,
-    mcst::node::insert_to_node_index,
 };
 
-use self::node::{ArcNode, Link, Node, NodeContent};
+use self::{
+    node::{ActionLink, ArcNode, Node, NodeContent},
+    valid_move::ValidMove,
+};
 
 static EXPLORATION_CONSTANT: f32 = SQRT_2;
 
@@ -20,6 +23,7 @@ pub mod node;
 mod playout;
 mod record;
 mod tests;
+mod valid_move;
 
 pub struct SearchTree {
     pub root: ArcNode,
@@ -34,12 +38,21 @@ impl SearchTree {
 
     pub fn record_move(&mut self, index: usize, board: Board) -> Board {
         let root = self.root.clone();
-        let children = root.children.read().unwrap();
+        let children = match root.children.get() {
+            Some(children) => children,
+            None => {
+                debug!("Attempting to record move {index} but children haven't been init'd for node {:?}", self.root); // TODO: This shouldnt be happening as often as it is
+                self.expansion(root.clone());
+                root.children.get().unwrap()
+            }
+        };
         let child = children[index].clone();
         drop(children);
         let new_root = match child {
-            Some(c) => c.clone(),
-            None => insert_to_node_index(&mut self.root, index, board).clone(),
+            ValidMove::Valid(c) => c.clone(),
+            ValidMove::Invalid => {
+                panic!("Something went wrong - attempting to record an invalid move")
+            }
         };
 
         self.root = new_root.clone();
@@ -47,58 +60,65 @@ impl SearchTree {
     }
 
     pub fn print_state(&self) {
-        let children = self.root.children.read().unwrap();
-        for i in 0..WIDTH {
-            let r = match children[i].clone() {
-                Some(c) => {
-                    // Else rank moves by simulation count
-                    let played = c.record.read().unwrap().played as usize;
-                    let result = c.result.get();
+        match self.root.children.get() {
+            Some(children) => {
+                for i in 0..WIDTH {
+                    match &children[i] {
+                        ValidMove::Valid(c) => {
+                            // Else rank moves by simulation count
+                            let played = c.record.read().unwrap().played as usize;
+                            let result = c.result.get();
 
-                    println!("Played+Result {i}: {played} - {result:?}",);
+                            println!("Played+Result {i}: {played} - {result:?}",);
+                        }
+                        ValidMove::Invalid => println!("{i}: not valid"),
+                    };
                 }
-                None => println!("{i}: not explored"),
-            };
+            }
+            None => println!("Unexplored root"),
         }
-        println!("Current selection: {}", self.select_move());
     }
 
-    pub fn select_move(&self) -> usize {
-        let children = self.root.children.read().unwrap();
-        let mut m: Option<usize> = None;
-        let mut m_s = i64::MIN;
-        for i in 0..WIDTH {
-            let r = match children[i].clone() {
-                Some(c) => {
-                    // If move is a winner pick it
-                    let r = c.result.get();
-                    match r {
-                        Some(r) => match r {
-                            GameResult::Win(winner) => {
-                                if *winner == self.root.board().active_player {
-                                    return i;
-                                } else {
-                                    -2
-                                }
+    pub fn choose_move(&self) -> usize {
+        match self.root.children.get() {
+            Some(children) => {
+                let mut m: Option<usize> = None;
+                let mut m_s = i64::MIN;
+                for i in 0..WIDTH {
+                    let r = match &children[i] {
+                        ValidMove::Valid(c) => {
+                            // If move is a winner pick it
+                            let r = c.result.get();
+                            match r {
+                                Some(r) => match r {
+                                    GameResult::Win(winner) => {
+                                        if *winner == self.root.board().active_player {
+                                            return i;
+                                        } else {
+                                            -2
+                                        }
+                                    }
+                                    GameResult::Draw => 0,
+                                },
+                                None => c.record.read().unwrap().played as i64,
                             }
-                            GameResult::Draw => 0,
-                        },
-                        None => c.record.read().unwrap().played as i64,
+                        }
+                        ValidMove::Invalid => i64::MIN,
+                    };
+                    if r > m_s {
+                        m = Some(i);
+                        m_s = r
                     }
                 }
-                None => i64::MIN,
-            };
-            if r > m_s {
-                m = Some(i);
-                m_s = r
-            }
-        }
 
-        if m.is_none() {
-            self.root.board().print_board();
-            panic!("no valid move found for node {:?}", self.root);
+                if m.is_none() {
+                    self.root.board().print_board();
+                    panic!("no valid move found for node {:?}", self.root);
+                }
+                m.unwrap()
+            }
+            None => panic!("Attempting to choose move when root has no children"),
         }
-        m.unwrap()
     }
 
     pub fn iterate(&mut self) {
@@ -109,9 +129,21 @@ impl SearchTree {
             return;
         }
 
-        let new_leaf = self.expansion(selection.clone().unwrap());
-        let sim_result = self.simulation(new_leaf.clone());
-        backpropagation(new_leaf.clone(), sim_result);
+        self.expansion(selection.clone().unwrap());
+        match selection.clone().unwrap().children.get() {
+            Some(children) => {
+                for i in 0..WIDTH {
+                    match &children[i] {
+                        ValidMove::Valid(m) => {
+                            let sim_result = self.simulation(m.clone());
+                            backpropagation(m.clone(), sim_result);
+                        }
+                        ValidMove::Invalid => (),
+                    }
+                }
+            }
+            None => (),
+        }
     }
 
     pub fn selection(&self) -> Option<ArcNode> {
@@ -127,8 +159,12 @@ impl SearchTree {
         }
 
         if !selected.clone().unwrap().is_leaf() {
-            let children = root.children.read();
-            println!("{children:?}");
+            match root.children.get() {
+                Some(children) => {
+                    println!("{children:?}");
+                }
+                None => (),
+            }
             root.board().print_board();
             println!(
                 "{} {} : {:?}",
@@ -141,39 +177,39 @@ impl SearchTree {
         selected
     }
 
-    pub fn expansion(&mut self, mut leaf: ArcNode) -> ArcNode {
-        let mut rand = rand::thread_rng();
+    pub fn expansion(&mut self, mut leaf: ArcNode) {
         let moves = leaf.board().get_moves();
-        let options: Vec<usize> = leaf
-            .get_uninitialized_children()
-            .into_iter()
-            .filter(|o| moves.contains(o))
-            .collect();
 
-        if options.len() == 0 {
-            panic!("No valid options for expansion");
-        }
+        let mut new_leaves: [ActionLink; WIDTH] = std::array::from_fn(|_| ValidMove::Invalid);
 
-        let rand_index: usize = rand.next_u64() as usize % options.len();
-
-        let selected_move = options[rand_index];
-        let new_state = leaf.board().play_move(selected_move);
-        let new_arc_node = insert_to_node_index(&mut leaf, selected_move, new_state);
-        match new_arc_node.result.get() {
-            Some(r) => {
-                match r {
-                    GameResult::Win(winner) => {
-                        if *winner == leaf.board().active_player {
-                            leaf.result.set(*r);
+        for selected_move in 0..WIDTH {
+            if moves.contains(&selected_move) {
+                let new_state = leaf.board().play_move(selected_move);
+                let new_arc_node = leaf.new_child(selected_move, new_state);
+                new_leaves[selected_move] = ValidMove::Valid(new_arc_node.clone());
+                match new_arc_node.result.get() {
+                    Some(r) => {
+                        match r {
+                            GameResult::Win(winner) => {
+                                if *winner == leaf.board().active_player {
+                                    match leaf.result.set(*r) {
+                                        Err(val) => {
+                                            if Some(&val) != leaf.result.get() {
+                                                panic!("Could not write result to {:?}. Write Value: {val}", leaf)
+                                            }
+                                        }
+                                        _ => (),
+                                    }
+                                }
+                            }
+                            GameResult::Draw => (), // TODO: Maybe we need to backpropagate draws?
                         }
                     }
-                    GameResult::Draw => (), // TODO: Maybe we need to prop draws up?
+                    None => (),
                 }
             }
-            None => (),
         }
-
-        new_arc_node.clone()
+        leaf.children.set(new_leaves);
     }
 
     pub fn simulation(&mut self, leaf: ArcNode) -> GameResult {
@@ -199,24 +235,27 @@ fn traverse_tree_ucb(node: ArcNode, parent_sims: f32, depth: usize) -> (Option<A
             calculate_node_uctb(node.clone(), parent_sims),
         )
     } else {
-        let children = node.children.read().unwrap();
-        let sims = node.record.read().unwrap().played as f32;
-        let mut max_score = f32::MIN;
-        let mut selected_node: Option<ArcNode> = None;
-        for i in 0..WIDTH {
-            let child = children[i].clone();
-            if child.is_some() {
-                let (selected, r) = traverse_tree_ucb(child.unwrap(), sims, depth + 1);
+        match node.children.get() {
+            Some(children) => {
+                let sims = node.record.read().unwrap().played as f32;
+                let mut max_score = f32::MIN;
+                let mut selected_node: Option<ArcNode> = None;
+                for i in 0..WIDTH {
+                    if let ValidMove::Valid(child) = &children[i] {
+                        let (selected, r) = traverse_tree_ucb(child.clone(), sims, depth + 1);
 
-                if r > max_score {
-                    max_score = r;
-                    selected_node = selected.clone();
+                        if r > max_score {
+                            max_score = r;
+                            selected_node = selected.clone();
+                        }
+                    }
                 }
-            }
-        }
 
-        // return max of
-        (selected_node, max_score)
+                // return max of
+                (selected_node, max_score)
+            }
+            None => panic!("Trying to find children of childless node {:?}", node),
+        }
     }
 }
 
