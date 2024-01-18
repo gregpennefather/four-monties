@@ -21,7 +21,7 @@ impl Player for Monty {
     fn select_move(&mut self, board: Board) -> usize {
         // self.search_tree.print_state();
 
-        for i in 0..10000 {
+        for i in 0..200 {
             self.search_tree.iterate();
         }
 

@@ -14,6 +14,9 @@ impl std::fmt::Display for GameResult {
 }
 
 pub fn from(mut board: Board) -> GameResult {
+    if let Some(r) = board.result {
+        return r
+    }
     if board.get_moves().len() == 0 {
         println!("Trying to simulate state with no moves: {board:?}");
     }

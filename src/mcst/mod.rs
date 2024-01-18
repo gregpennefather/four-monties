@@ -66,8 +66,8 @@ impl SearchTree {
     pub fn select_move(&self) -> usize {
         let children = self.root.children.read().unwrap();
         let yellow_turn = self.root.board().yellow_turn;
-        let mut m = 0;
-        let mut m_s = 0;
+        let mut m: Option<usize> = None;
+        let mut m_s = i64::MIN;
         for i in 0..WIDTH {
             let r = match children[i].clone() {
                 Some(c) => {
@@ -75,28 +75,32 @@ impl SearchTree {
                     match c.result.try_read() {
                         Ok(r) => {
                             if r.is_some() {
-                                println!("evaluating winning move {i}: {r:?} for {} turn", if yellow_turn { "Yellow" } else { "Blue"});
                                 match r.unwrap() {
-                                    GameResult::YellowWin => if yellow_turn { return i } else { 0 },
-                                    GameResult::BlueWin => if !yellow_turn { return i } else { 0 },
+                                    GameResult::YellowWin => if yellow_turn { return i } else { -2 },
+                                    GameResult::BlueWin => if !yellow_turn { return i } else { -2 },
                                     GameResult::Draw => 0,
                                 }
                             } else {
-                                c.record.read().unwrap().played as usize
+                                c.record.read().unwrap().played as i64
                             }
                         }
                         Err(e) => panic!("{e}"),
                     }
                 }
-                None => 0,
+                None => i64::MIN,
             };
-            println!("r {r} vs {m_s}");
             if r > m_s {
-                m = i;
+                m = Some(i);
                 m_s = r
             }
         }
-        m
+
+        if m.is_none() {
+            self.root.board().print_board();
+            panic!("no valid move found for node {:?}", self.root);
+        }
+        m.unwrap()
+
     }
 
     pub fn iterate(&mut self) {
@@ -125,7 +129,6 @@ impl SearchTree {
         }
 
         if !selected.clone().unwrap().is_leaf() {
-            println!("root {root:?}");
             let children = root.children.read();
             println!("{children:?}");
             root.board().print_board();
@@ -161,17 +164,7 @@ impl SearchTree {
         match new_arc_node.result.try_read() {
             Ok(r) => {
                 if r.is_some() {
-                    println!(
-                        "Expanded new complete node {new_arc_node:?} after {} move",
-                        if leaf.board().yellow_turn {
-                            "Yellow"
-                        } else {
-                            "Blue"
-                        }
-                    );
-
                     if r.unwrap() == GameResult::YellowWin && leaf.board().yellow_turn || r.unwrap() == GameResult::BlueWin && !leaf.board().yellow_turn {
-                        println!("Winner discovered for leaf: {leaf:?}");
                         match leaf.result.try_write() {
                             Ok(mut w) => *w = *r,
                             Err(e) => panic!("{e}")

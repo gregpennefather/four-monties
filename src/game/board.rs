@@ -6,6 +6,7 @@ use super::result::GameResult;
 
 pub const WIDTH: usize = 7;
 pub const HEIGHT: usize = 6;
+pub const MAX_INDEX: usize = WIDTH * HEIGHT;
 
 #[derive(Copy, Clone)]
 pub struct Board {
@@ -14,6 +15,7 @@ pub struct Board {
     pub column_pieces: [usize; WIDTH],
     pub yellow_turn: bool,
     pub result: Option<GameResult>,
+    pub turn: u32
 }
 
 impl PartialEq for Board {
@@ -30,6 +32,7 @@ impl Default for Board {
             column_pieces: [0; WIDTH],
             yellow_turn: true,
             result: None,
+            turn: 0
         }
     }
 }
@@ -65,6 +68,13 @@ impl Board {
         let mut n_b = self.clone();
         let row = self.column_pieces[column];
         let index = row * WIDTH + column; // Double check this
+        if index >= MAX_INDEX {
+            println!("attempting to play move: {column} in state {self:?} for {}", if self.yellow_turn { "Yellow" } else { "Blue" });
+            self.print_board();
+            println!("{:?}", self.get_moves());
+            println!("{:?}", self.column_pieces);
+            panic!("invalid move {column}");
+        }
         let is_yellow = self.yellow_turn;
         if self.yellow_turn {
             n_b.yellow_bb ^= 1 << index;
@@ -73,6 +83,7 @@ impl Board {
         }
         n_b.column_pieces[column] += 1;
         n_b.yellow_turn = !self.yellow_turn;
+        n_b.turn += 1;
         n_b.update_winner(index, is_yellow);
         n_b
     }
@@ -140,6 +151,7 @@ impl Board {
             yellow_turn: blue_bb.count_ones() == yellow_bb.count_ones(),
             column_pieces,
             result: None,
+            turn: yellow_bb.count_ones() + blue_bb.count_ones() + 1
         }
     }
 }
