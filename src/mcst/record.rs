@@ -2,8 +2,8 @@ use crate::game::result::GameResult;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Record {
-    pub wins: u16,
-    pub played: u16,
+    pub wins: u64,
+    pub played: u64,
 }
 
 impl Record {

@@ -7,12 +7,14 @@ use super::Agent;
 
 pub struct Monty {
     search_tree: SearchTree,
+    iterations: usize
 }
 
 impl Monty {
-    pub fn new(board: Board) -> Self {
+    pub fn new(board: Board, iterations: usize, simulations: usize) -> Self {
         Self {
-            search_tree: SearchTree::new(board),
+            search_tree: SearchTree::new(board, simulations),
+            iterations
         }
     }
 }
@@ -21,7 +23,7 @@ impl Agent for Monty {
     fn select_move(&mut self, board: Board) -> usize {
         // self.search_tree.print_state();
 
-        for i in 0..200 {
+        for i in 0..self.iterations {
             self.search_tree.iterate();
         }
 

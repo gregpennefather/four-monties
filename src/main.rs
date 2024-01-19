@@ -6,7 +6,7 @@ use crate::{
         result::GameResult, player::Player,
     },
     agent::{monty::Monty, randy::Randy, yu::Yu},
-    tournament::Tournament,
+    tournament::Tournament, mcst::SearchTree,
 };
 use colored::Colorize;
 use rand::RngCore;
@@ -22,9 +22,9 @@ fn main() {
     let mut blue_wins = 0;
     let mut blue_win_aggregate_turns = 0;
     let mut draws = 0;
-    for i in 0..500 {
+    for i in 0..20 {
         let board = Board::default();
-        let mut tournament = Tournament::new(Box::new(Monty::new(board)), Box::new(Randy));
+        let mut tournament = Tournament::new(Box::new(Monty::new(board, 50, 50)), Box::new(Monty::new(board, 100, 50)));
 
         let board = tournament.play();
 
@@ -34,6 +34,7 @@ fn main() {
                 match r {
                     Player::NoPlayer => {
                         draws += 1;
+                        board.print_board();
                         "Draw".to_string()
                     }
                     Player::Yellow => {
@@ -44,6 +45,7 @@ fn main() {
                     Player::Blue => {
                         blue_wins += 1;
                         blue_win_aggregate_turns += board.turn;
+                        board.print_board();
                         "Blue Wins".blue().to_string()
                     }
                 },

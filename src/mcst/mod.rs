@@ -27,12 +27,14 @@ mod valid_move;
 
 pub struct SearchTree {
     pub root: ArcNode,
+    simulations: usize,
 }
 
 impl SearchTree {
-    pub fn new(board: Board) -> Self {
+    pub fn new(board: Board, simulations: usize) -> Self {
         Self {
             root: Arc::new(NodeContent::new_root(board)),
+            simulations,
         }
     }
 
@@ -46,10 +48,9 @@ impl SearchTree {
                 root.children.get().unwrap()
             }
         };
-        let child = children[index].clone();
-        drop(children);
-        let new_root = match child {
+        let new_root = match &children[index] {
             ValidMove::Valid(c) => c.clone(),
+
             ValidMove::Invalid => {
                 panic!("Something went wrong - attempting to record an invalid move")
             }
@@ -60,20 +61,23 @@ impl SearchTree {
     }
 
     pub fn print_state(&self) {
+        println!("State winner: {:?}", self.root.result.get());
         match self.root.children.get() {
             Some(children) => {
                 for i in 0..WIDTH {
                     match &children[i] {
                         ValidMove::Valid(c) => {
                             // Else rank moves by simulation count
+                            let wins = c.record.read().unwrap().wins as usize;
                             let played = c.record.read().unwrap().played as usize;
                             let result = c.result.get();
 
-                            println!("Played+Result {i}: {played} - {result:?}",);
+                            println!("Option {i}: {wins}\\{played} - {result:?}",);
                         }
                         ValidMove::Invalid => println!("{i}: not valid"),
                     };
                 }
+                println!("Expected move: {}", self.choose_move());
             }
             None => println!("Unexplored root"),
         }
@@ -122,10 +126,15 @@ impl SearchTree {
     }
 
     pub fn iterate(&mut self) {
+        // Game over no need to iterate
+        if self.root.result.get().is_some() {
+            return;
+        }
+
         let selection = self.selection();
 
         if selection.is_none() {
-            println!("No expansion for root {:?}", self.root);
+            debug!("No expansion for root {:?}", self.root);
             return;
         }
 
@@ -135,8 +144,10 @@ impl SearchTree {
                 for i in 0..WIDTH {
                     match &children[i] {
                         ValidMove::Valid(m) => {
-                            let sim_result = self.simulation(m.clone());
-                            backpropagation(m.clone(), sim_result);
+                            for i in 0..self.simulations {
+                                let sim_result = self.simulation(m.clone());
+                                backpropagation(m.clone(), sim_result);
+                            }
                         }
                         ValidMove::Invalid => (),
                     }
@@ -154,7 +165,7 @@ impl SearchTree {
         // println!("Selected {selected:?} with score {score}");
 
         if selected.is_none() {
-            println!("No valid expansion for root {root:?}");
+            debug!("No valid expansion for root {root:?}");
             return None;
         }
 
@@ -187,6 +198,7 @@ impl SearchTree {
                 let new_state = leaf.board().play_move(selected_move);
                 let new_arc_node = leaf.new_child(selected_move, new_state);
                 new_leaves[selected_move] = ValidMove::Valid(new_arc_node.clone());
+
                 match new_arc_node.result.get() {
                     Some(r) => {
                         match r {
@@ -284,7 +296,7 @@ mod test {
     #[test]
     pub fn insert_to_tree_root() {
         // Act
-        let tree = SearchTree::new(Board::default());
+        let tree = SearchTree::new(Board::default(), 10);
 
         // Assert
         assert_eq!(tree.root.board, Board::default());

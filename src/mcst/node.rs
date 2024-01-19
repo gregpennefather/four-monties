@@ -49,21 +49,7 @@ impl NodeContent {
     }
 
     pub fn is_leaf(&self) -> bool {
-        let moves = self.board.get_moves();
-        let children = self.children.get();
-
-        match children {
-            Some(c) => {
-                for i in 0..WIDTH {
-                    if c[i].is_valid() && moves.contains(&i) {
-                        return true;
-                    }
-                }
-            }
-            None => return true,
-        }
-
-        false
+        self.children.get().is_none()
     }
 }
 
@@ -87,7 +73,7 @@ impl Debug for NodeContent {
             .field(&self.board)
             .field(&self.record.read())
             .field(&self.is_leaf())
-            .field(&self.result)
+            .field(&self.result.get())
             .finish()
     }
 }
